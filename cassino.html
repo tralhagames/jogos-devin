@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cassino do Devin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body {
+    background: radial-gradient(ellipse at top, #1a3a2a 0%, #0a1f14 60%, #050f0a 100%);
+    min-height: 100vh; color: #fff; padding: 20px;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    max-width: 900px; margin: 0 auto 20px; flex-wrap: wrap; gap: 10px;
+  }
+  h1 { color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,.5); font-size: 2em; }
+  .saldo {
+    background: #142b1e; border: 2px solid #ffd700; border-radius: 12px;
+    padding: 10px 20px; font-size: 1.4em; color: #ffd700; font-weight: bold;
+  }
+  .tabs { display: flex; gap: 10px; max-width: 900px; margin: 0 auto 20px; }
+  .tab {
+    flex: 1; padding: 12px; background: #142b1e; border: 2px solid #2a5a3a;
+    border-radius: 10px; cursor: pointer; text-align: center; font-size: 1.1em;
+    transition: all .2s;
+  }
+  .tab:hover { border-color: #ffd700; }
+  .tab.ativo { background: #ffd700; color: #0a1f14; font-weight: bold; border-color: #ffd700; }
+  .jogo { display: none; max-width: 900px; margin: 0 auto; background: #142b1e;
+    border: 2px solid #2a5a3a; border-radius: 16px; padding: 30px; text-align: center; }
+  .jogo.ativo { display: block; }
+  .msg { min-height: 30px; font-size: 1.3em; margin: 15px 0; color: #ffd700; }
+  button.acao {
+    background: linear-gradient(180deg, #ffd700, #b8860b); border: none; border-radius: 10px;
+    padding: 12px 28px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin: 5px;
+    color: #1a1a1a; transition: transform .1s;
+  }
+  button.acao:hover { transform: scale(1.05); }
+  button.acao:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  input[type=number] {
+    width: 100px; padding: 10px; font-size: 1.1em; border-radius: 8px; border: 2px solid #ffd700;
+    background: #0a1f14; color: #ffd700; text-align: center;
+  }
+
+  /* Slots */
+  .rolos { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
+  .rolo {
+    width: 110px; height: 110px; background: #0a1f14; border: 3px solid #ffd700;
+    border-radius: 14px; font-size: 4em; display: flex; align-items: center;
+    justify-content: center; overflow: hidden;
+  }
+  .rolo.girando { animation: shake .1s infinite; }
+  @keyframes shake { 0%{transform:translateY(-4px)} 50%{transform:translateY(4px)} 100%{transform:translateY(-4px)} }
+  .pagamentos { font-size: .85em; color: #9fc9ad; margin-top: 15px; line-height: 1.6; }
+
+  /* Blackjack */
+  .mao { margin: 15px 0; }
+  .mao .cartas { display: flex; justify-content: center; gap: 8px; min-height: 100px; flex-wrap: wrap; }
+  .carta {
+    width: 70px; height: 100px; background: #fff; color: #1a1a1a; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 1.5em; font-weight: bold; box-shadow: 2px 2px 6px rgba(0,0,0,.5);
+    animation: deal .3s ease-out;
+  }
+  .carta.vermelha { color: #c0392b; }
+  .carta.verso { background: repeating-linear-gradient(45deg,#8e44ad,#8e44ad 8px,#5e2d78 8px,#5e2d78 16px); color: transparent; }
+  .carta.verso * { visibility: hidden; }
+  @keyframes deal { from { transform: translateY(-30px) rotate(-10deg); opacity: 0; } }
+  .pontos { color: #9fc9ad; margin-top: 8px; }
+
+  /* Roleta */
+  .roleta-display {
+    width: 140px; height: 140px; margin: 20px auto; border-radius: 50%;
+    border: 6px solid #ffd700; display: flex; align-items: center; justify-content: center;
+    font-size: 3em; font-weight: bold; background: #0a1f14; transition: all .2s;
+  }
+  .roleta-display.girando { animation: spin .15s linear infinite; }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  .apostas-roleta { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 15px 0; }
+  .aposta-btn {
+    padding: 10px 16px; border-radius: 8px; border: 2px solid #2a5a3a; background: #0a1f14;
+    color: #fff; cursor: pointer; font-size: 1em;
+  }
+  .aposta-btn.sel { border-color: #ffd700; background: #ffd700; color: #0a1f14; font-weight: bold; }
+  .aposta-btn.verm { background: #8e1f1f; }
+  .aposta-btn.verm.sel { background: #e74c3c; color: #fff; }
+  .aposta-btn.pret { background: #222; }
+  .aposta-btn.pret.sel { background: #555; color: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎰 Cassino do Devin</h1>
+  <div class="saldo">💰 <span id="saldo">1000</span> fichas</div>
+</header>
+
+<div class="tabs">
+  <div class="tab ativo" onclick="trocarJogo('slots', this)">🎰 Caça-níquel</div>
+  <div class="tab" onclick="trocarJogo('bj', this)">🃏 Blackjack</div>
+  <div class="tab" onclick="trocarJogo('roleta', this)">🎡 Roleta</div>
+</div>
+
+<!-- ============ SLOTS ============ -->
+<div class="jogo ativo" id="jogo-slots">
+  <div class="rolos">
+    <div class="rolo" id="rolo0">🍒</div>
+    <div class="rolo" id="rolo1">🍋</div>
+    <div class="rolo" id="rolo2">💎</div>
+  </div>
+  <div class="msg" id="msg-slots"></div>
+  <div>
+    Aposta: <input type="number" id="aposta-slots" value="10" min="1">
+    <button class="acao" id="btn-girar" onclick="girarSlots()">GIRAR</button>
+  </div>
+  <div class="pagamentos">
+    3 iguais → 10x &nbsp;|&nbsp; 💎💎💎 → 50x &nbsp;|&nbsp; 7️⃣7️⃣7️⃣ → 100x<br>
+    2 iguais → 2x &nbsp;|&nbsp; qualquer 🍒 → devolve a aposta
+  </div>
+</div>
+
+<!-- ============ BLACKJACK ============ -->
+<div class="jogo" id="jogo-bj">
+  <div class="mao"><strong>Dealer</strong>
+    <div class="cartas" id="cartas-dealer"></div>
+    <div class="pontos" id="pontos-dealer"></div>
+  </div>
+  <div class="mao"><strong>Você</strong>
+    <div class="cartas" id="cartas-jogador"></div>
+    <div class="pontos" id="pontos-jogador"></div>
+  </div>
+  <div class="msg" id="msg-bj"></div>
+  <div id="bj-aposta-area">
+    Aposta: <input type="number" id="aposta-bj" value="25" min="1">
+    <button class="acao" onclick="iniciarBJ()">DISTRIBUIR</button>
+  </div>
+  <div id="bj-acoes" style="display:none">
+    <button class="acao" onclick="bjHit()">PEDIR CARTA</button>
+    <button class="acao" onclick="bjStand()">PARAR</button>
+    <button class="acao" onclick="bjDouble()">DOBRAR</button>
+  </div>
+</div>
+
+<!-- ============ ROLETA ============ -->
+<div class="jogo" id="jogo-roleta">
+  <div class="roleta-display" id="roleta-num">?</div>
+  <div class="msg" id="msg-roleta"></div>
+  <div>
+    Aposta: <input type="number" id="aposta-roleta" value="10" min="1">
+  </div>
+  <div class="apostas-roleta">
+    <button class="aposta-btn verm" data-ap="vermelho" onclick="selRoleta(this)">Vermelho (2x)</button>
+    <button class="aposta-btn pret" data-ap="preto" onclick="selRoleta(this)">Preto (2x)</button>
+    <button class="aposta-btn" data-ap="par" onclick="selRoleta(this)">Par (2x)</button>
+    <button class="aposta-btn" data-ap="impar" onclick="selRoleta(this)">Ímpar (2x)</button>
+    <button class="aposta-btn" data-ap="numero" onclick="selRoleta(this)">Número (36x)</button>
+  </div>
+  <div id="roleta-num-escolha" style="display:none; margin:10px 0;">
+    Número (0-36): <input type="number" id="num-roleta" value="7" min="0" max="36">
+  </div>
+  <button class="acao" id="btn-roleta" onclick="girarRoleta()" disabled>GIRAR ROLETA</button>
+</div>
+
+<script>
+let saldo = 1000;
+const $ = id => document.getElementById(id);
+
+function atualizaSaldo() {
+  $('saldo').textContent = saldo;
+  if (saldo <= 0) {
+    setTimeout(() => {
+      if (confirm('Suas fichas acabaram! Quer mais 1000 de graça?')) {
+        saldo = 1000; atualizaSaldo();
+      }
+    }, 300);
+  }
+}
+function pegaAposta(id) {
+  const v = Math.floor(Number($(id).value));
+  if (!v || v < 1) { return null; }
+  if (v > saldo) { return -1; }
+  return v;
+}
+function trocarJogo(nome, el) {
+  document.querySelectorAll('.jogo').forEach(j => j.classList.remove('ativo'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('ativo'));
+  $('jogo-' + nome).classList.add('ativo');
+  el.classList.add('ativo');
+}
+
+/* ================= SLOTS ================= */
+const SIMBOLOS = ['🍒','🍋','🍇','🔔','⭐','💎','7️⃣'];
+let girandoSlots = false;
+
+function girarSlots() {
+  if (girandoSlots) return;
+  const ap = pegaAposta('aposta-slots');
+  if (ap === null) { $('msg-slots').textContent = 'Aposta inválida!'; return; }
+  if (ap === -1) { $('msg-slots').textContent = 'Fichas insuficientes!'; return; }
+  saldo -= ap; atualizaSaldo();
+  girandoSlots = true;
+  $('btn-girar').disabled = true;
+  $('msg-slots').textContent = '';
+
+  const rolos = [$('rolo0'), $('rolo1'), $('rolo2')];
+  const resultado = SIMBOLOS.map(() => SIMBOLOS[Math.floor(Math.random()*SIMBOLOS.length)]);
+  rolos.forEach(r => r.classList.add('girando'));
+
+  const timers = [900, 1400, 1900];
+  rolos.forEach((rolo, i) => {
+    const iv = setInterval(() => {
+      rolo.textContent = SIMBOLOS[Math.floor(Math.random()*SIMBOLOS.length)];
+    }, 80);
+    setTimeout(() => {
+      clearInterval(iv);
+      rolo.textContent = resultado[i];
+      rolo.classList.remove('girando');
+      if (i === 2) fimSlots(resultado, ap);
+    }, timers[i]);
+  });
+}
+
+function fimSlots(r, ap) {
+  let ganho = 0;
+  const [a,b,c] = r;
+  if (a===b && b===c) {
+    ganho = a==='7️⃣' ? ap*100 : a==='💎' ? ap*50 : ap*10;
+  } else if (a===b || b===c || a===c) {
+    ganho = ap*2;
+  } else if (r.includes('🍒')) {
+    ganho = ap;
+  }
+  if (ganho > 0) {
+    saldo += ganho;
+    $('msg-slots').textContent = `🎉 Ganhou ${ganho} fichas!`;
+  } else {
+    $('msg-slots').textContent = 'Nada dessa vez... gira de novo!';
+  }
+  atualizaSaldo();
+  girandoSlots = false;
+  $('btn-girar').disabled = false;
+}
+
+/* ================= BLACKJACK ================= */
+const NAIPES = ['♠','♥','♦','♣'];
+const VALORES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let baralho = [], maoJ = [], maoD = [], apostaBJ = 0, emJogo = false;
+
+function novoBaralho() {
+  baralho = [];
+  for (const n of NAIPES) for (const v of VALORES) baralho.push({v, n});
+  baralho.sort(() => Math.random() - .5);
+}
+function valorMao(mao) {
+  let t = 0, ases = 0;
+  for (const c of mao) {
+    if (c.v === 'A') { t += 11; ases++; }
+    else if (['J','Q','K'].includes(c.v)) t += 10;
+    else t += Number(c.v);
+  }
+  while (t > 21 && ases > 0) { t -= 10; ases--; }
+  return t;
+}
+function cartaHTML(c, oculta) {
+  const cor = (c.n === '♥' || c.n === '♦') ? 'vermelha' : '';
+  if (oculta) return `<div class="carta verso"><span>${c.v}${c.n}</span></div>`;
+  return `<div class="carta ${cor}"><span>${c.v}</span><span>${c.n}</span></div>`;
+}
+function renderBJ(escondeDealer) {
+  $('cartas-jogador').innerHTML = maoJ.map(c => cartaHTML(c)).join('');
+  $('cartas-dealer').innerHTML = maoD.map((c,i) => cartaHTML(c, escondeDealer && i===1)).join('');
+  $('pontos-jogador').textContent = 'Pontos: ' + valorMao(maoJ);
+  $('pontos-dealer').textContent = escondeDealer ? 'Pontos: ?' : 'Pontos: ' + valorMao(maoD);
+}
+function iniciarBJ() {
+  const ap = pegaAposta('aposta-bj');
+  if (ap === null) { $('msg-bj').textContent = 'Aposta inválida!'; return; }
+  if (ap === -1) { $('msg-bj').textContent = 'Fichas insuficientes!'; return; }
+  apostaBJ = ap; saldo -= ap; atualizaSaldo();
+  novoBaralho();
+  maoJ = [baralho.pop(), baralho.pop()];
+  maoD = [baralho.pop(), baralho.pop()];
+  emJogo = true;
+  $('bj-aposta-area').style.display = 'none';
+  $('bj-acoes').style.display = 'block';
+  $('msg-bj').textContent = '';
+  renderBJ(true);
+  if (valorMao(maoJ) === 21) bjStand(); // blackjack!
+}
+function bjHit() {
+  if (!emJogo) return;
+  maoJ.push(baralho.pop());
+  renderBJ(true);
+  if (valorMao(maoJ) > 21) fimBJ('💥 Estourou! Perdeu ' + apostaBJ + ' fichas.');
+}
+function bjDouble() {
+  if (!emJogo || maoJ.length !== 2) return;
+  if (saldo < apostaBJ) { $('msg-bj').textContent = 'Sem fichas pra dobrar!'; return; }
+  saldo -= apostaBJ; apostaBJ *= 2; atualizaSaldo();
+  maoJ.push(baralho.pop());
+  renderBJ(true);
+  if (valorMao(maoJ) > 21) fimBJ('💥 Estourou! Perdeu ' + apostaBJ + ' fichas.');
+  else bjStand();
+}
+function bjStand() {
+  if (!emJogo) return;
+  renderBJ(false);
+  while (valorMao(maoD) < 17) { maoD.push(baralho.pop()); renderBJ(false); }
+  const pj = valorMao(maoJ), pd = valorMao(maoD);
+  const bjNatural = pj === 21 && maoJ.length === 2;
+  if (pd > 21) {
+    const g = bjNatural ? Math.floor(apostaBJ * 2.5) : apostaBJ * 2;
+    saldo += g; fimBJ(`🎉 Dealer estourou! Ganhou ${g} fichas!`);
+  } else if (pj > pd) {
+    const g = bjNatural ? Math.floor(apostaBJ * 2.5) : apostaBJ * 2;
+    saldo += g; fimBJ(`🎉 Você venceu! +${g} fichas!`);
+  } else if (pj === pd) {
+    saldo += apostaBJ; fimBJ('🤝 Empate! Aposta devolvida.');
+  } else {
+    fimBJ(`😢 Dealer venceu. Perdeu ${apostaBJ} fichas.`);
+  }
+}
+function fimBJ(msg) {
+  emJogo = false;
+  $('msg-bj').textContent = msg;
+  $('bj-aposta-area').style.display = 'block';
+  $('bj-acoes').style.display = 'none';
+  renderBJ(false);
+  atualizaSaldo();
+}
+
+/* ================= ROLETA ================= */
+const VERMELHOS = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+let apostaRoleta = null, girandoRoleta = false;
+
+function selRoleta(btn) {
+  document.querySelectorAll('.aposta-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  apostaRoleta = btn.dataset.ap;
+  $('roleta-num-escolha').style.display = apostaRoleta === 'numero' ? 'block' : 'none';
+  $('btn-roleta').disabled = false;
+}
+function corNumero(n) {
+  if (n === 0) return '#27ae60';
+  return VERMELHOS.includes(n) ? '#e74c3c' : '#333';
+}
+function girarRoleta() {
+  if (girandoRoleta || !apostaRoleta) return;
+  const ap = pegaAposta('aposta-roleta');
+  if (ap === null) { $('msg-roleta').textContent = 'Aposta inválida!'; return; }
+  if (ap === -1) { $('msg-roleta').textContent = 'Fichas insuficientes!'; return; }
+  let numEscolhido = null;
+  if (apostaRoleta === 'numero') {
+    numEscolhido = Math.floor(Number($('num-roleta').value));
+    if (numEscolhido < 0 || numEscolhido > 36) { $('msg-roleta').textContent = 'Número inválido!'; return; }
+  }
+  saldo -= ap; atualizaSaldo();
+  girandoRoleta = true;
+  $('btn-roleta').disabled = true;
+  $('msg-roleta').textContent = '';
+  const disp = $('roleta-num');
+  disp.classList.add('girando');
+
+  const resultado = Math.floor(Math.random() * 37);
+  const iv = setInterval(() => {
+    const n = Math.floor(Math.random() * 37);
+    disp.textContent = n;
+    disp.style.background = corNumero(n);
+    disp.style.color = '#fff';
+  }, 80);
+  setTimeout(() => {
+    clearInterval(iv);
+    disp.classList.remove('girando');
+    disp.textContent = resultado;
+    disp.style.background = corNumero(resultado);
+    fimRoleta(resultado, ap, numEscolhido);
+  }, 2200);
+}
+function fimRoleta(n, ap, numEscolhido) {
+  let ganho = 0;
+  if (apostaRoleta === 'numero') {
+    if (n === numEscolhido) ganho = ap * 36;
+  } else if (apostaRoleta === 'vermelho' && VERMELHOS.includes(n)) ganho = ap * 2;
+  else if (apostaRoleta === 'preto' && n !== 0 && !VERMELHOS.includes(n)) ganho = ap * 2;
+  else if (apostaRoleta === 'par' && n !== 0 && n % 2 === 0) ganho = ap * 2;
+  else if (apostaRoleta === 'impar' && n % 2 === 1) ganho = ap * 2;
+
+  if (ganho > 0) {
+    saldo += ganho;
+    $('msg-roleta').textContent = `🎉 Saiu ${n}! Ganhou ${ganho} fichas!`;
+  } else {
+    $('msg-roleta').textContent = `Saiu ${n}. Perdeu ${ap} fichas.`;
+  }
+  atualizaSaldo();
+  girandoRoleta = false;
+  $('btn-roleta').disabled = false;
+}
+</script>
+</body>
+</html>
